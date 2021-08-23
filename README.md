@@ -15,3 +15,4 @@ Optional command line arguments can also be used:
 * -h: Displays a help page
 * -u [URL]: Connects to URL provided in [URL] rather than the default ([a secret very fun link](https://en.wikipedia.org/wiki/Cat))
 * -c: Turns the program to connect only mode; it only confirms that a connection can be made to the URL, and doesn't download what's there.
+* -t [timeout]: Sets a timeout, in seconds.
