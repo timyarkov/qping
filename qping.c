@@ -62,12 +62,19 @@ int parse_args(int argc, char** argv, char* url, struct prog_flags* pf) {
             printf("  -c: Sets to connect only mode; no packages are ");
             printf("sent/recieved\n");
 
+            printf("\n");
+
+            printf("  -t [timeout]: Sets a custom timeout for connecting ");
+            printf("(in seconds)\n");
+            printf("    ->Default is 5 seconds\n");
+            printf("    ->Value given must be >= 0\n");
+
             exit(0);
         } else if (strcmp(argv[i], "-u") == 0) {
             // Check error case of no extra arg given as required
             if (i == argc - 1) {
-                fprintf(stderr, "Incorrect use of argument.\n\n");
-                fprintf(stderr, "\tUsage: -u [URL]\n");
+                fprintf(stderr, "Incorrect use of argument.\n");
+                fprintf(stderr, "\tUsage: -u [URL]\n\n");
 
                 return 1;
             }
@@ -85,13 +92,33 @@ int parse_args(int argc, char** argv, char* url, struct prog_flags* pf) {
             memcpy(url, argv[i], strlen(argv[i]));
         } else if (strcmp(argv[i], "-c") == 0) {
             pf->connect_only = 1;
+        } else if (strcmp(argv[i], "-t") == 0) {
+            // Check error case of no extra arg given as required
+            if (i == argc - 1) {
+                fprintf(stderr, "Incorrect use of argument.\n");
+                fprintf(stderr, "\tUsage: -t [timeout]\n\n");
+
+                return 1;
+            }
+
+            i++;
+
+            // Check that input is good
+            if (!is_numeric(argv[i])) {
+                fprintf(stderr, "Incorrect use of argument.\n");
+                fprintf(stderr, "\tTimeout given must be numeric, and >= 0\n\n");
+
+                return 1;
+            }
+
+            pf->timeout = strtol(argv[i], NULL, 10);
         } else {
             fprintf(stderr, "Unrecognised argument \"%s\".\n", argv[i]);
             
             #ifdef QP_MODE
-                fprintf(stderr, "Please use qp help for valid arguments.\n");
+                fprintf(stderr, "Please use qp -h for valid arguments.\n");
             #else
-                fprintf(stderr, "Please use qping help for valid arguments.\n");
+                fprintf(stderr, "Please use qping -h for valid arguments.\n");
             #endif
 
             return 1;
@@ -125,13 +152,15 @@ size_t write_check(void* ptr, size_t size, size_t n, void* userdata) {
 
 int main(int argc, char** argv) {
     // Program initialisation
+    // Parameter defaults
     struct prog_flags pf;
     pf.connect_only = 0;
+    pf.timeout = 5;
 
     char url[BUFFER_SIZE];
 
     if (parse_args(argc, argv, url, &pf) != 0) {
-        fprintf(stderr, "Argument parsing failed.");
+        fprintf(stderr, "Argument parsing failed.\n");
 
         return 1;
     }
@@ -164,6 +193,12 @@ int main(int argc, char** argv) {
         curl_global_cleanup();
 
         return 1;
+    } else if (curl_easy_setopt(handle, CURLOPT_TIMEOUT, pf.timeout) != CURLE_OK) {
+        fprintf(stderr, "Failed to set timeout option for handle.\n");
+        curl_easy_cleanup(handle);
+        curl_global_cleanup();
+
+        return 1;
     }
 
     // Do the connect
@@ -189,6 +224,14 @@ int main(int argc, char** argv) {
 
         if (curl_easy_setopt(handle, CURLOPT_URL, url) != CURLE_OK) {
             fprintf(stderr, "Failed to set URL for handle.\n");
+            curl_easy_cleanup(handle);
+            curl_global_cleanup();
+
+            return 1;
+        }
+
+        if (curl_easy_setopt(handle, CURLOPT_TIMEOUT, pf.timeout) != CURLE_OK) {
+            fprintf(stderr, "Failed to set timeout option for handle.\n");
             curl_easy_cleanup(handle);
             curl_global_cleanup();
 
@@ -231,11 +274,21 @@ int main(int argc, char** argv) {
             time_taken = ((end - start) * 1000) / CLOCKS_PER_SEC;
 
             printf("%lu bytes received in %dms\n", d.size, time_taken % 1000);
+        } else {
+            printf("\nConnected, but didn't download resource in required ");
+            printf("%ld second timeout.\n", pf.timeout);
+            printf("Consider checking your connection speed.\n");
+
+            curl_easy_cleanup(handle);
+            curl_global_cleanup();
+
+            return 0;
         }
 
         free(d.data);
     } else {
         printf("Unsuccessful connect to %s.\n", url);
+        printf("Consider checking your connection status.\n");
         curl_easy_cleanup(handle);
         curl_global_cleanup();
 
@@ -247,3 +300,25 @@ int main(int argc, char** argv) {
 
     return 0;
 }
+
+// Supplementary functions
+int is_numeric(char* str) {
+    // Checks that all characters in a string are numbers (positive only).
+    // str: string to check
+    // Returns 1 if all numeric, 0 if not.
+    
+    // Error Checking
+    if (str == NULL) {
+        return 0;
+    }
+    
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] < 48 || str[i] > 57) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+
