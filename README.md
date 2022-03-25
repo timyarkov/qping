@@ -6,6 +6,8 @@ Use the included makefile; `make qping` to compile, then `./qping` to run.
 
 You can also use `make qp` so that compiles with a shorter name and thus can be ran quicker via `./qp`.
 
+> Requires `libcurl` to be on your system to compile and run!
+
 ## Usage
 Running qping without any arguments will connect to a website and download what's located there to heap memory. 
 
